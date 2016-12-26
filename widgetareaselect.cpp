@@ -11,7 +11,7 @@ enum DefaultSizes{
 };
 
 WidgetAreaSelect::WidgetAreaSelect(QWidget *parent)
-    : QWidget(parent)
+    : QWidget(parent), _minWidth(50),_minHeight(50)
 {
     init();
 }
@@ -23,12 +23,13 @@ WidgetAreaSelect::~WidgetAreaSelect()
 
 void WidgetAreaSelect::mouseMoveEvent(QMouseEvent *event)
 {
-    qDebug() << "mousemove";
     QWidget::mouseMoveEvent(event);
 
     const QPoint &pos = event->pos();
+    updateMasterItem(pos);
 
-    if(_resizeMode == NoResize){
+    switch(_resizeMode){
+    case NoResize:
         setCursor(QCursor());
         for(int itemIndex = 0; itemIndex < controlsCount; ++itemIndex){
             Controls item = static_cast<Controls>(itemIndex);
@@ -37,10 +38,57 @@ void WidgetAreaSelect::mouseMoveEvent(QMouseEvent *event)
                 break;
             }
         }
+        break;
+    case HorizontalResize:
+        switch(_masterItem){
+        case controlLeftCenter:
+            trySetLeft(pos.x());
+            break;
+        case controlRightCenter:
+            trySetRight(pos.x());
+            break;
+        default:
+            Q_ASSERT(false);
+        }
+        break;
+    case VerticalResize:
+        switch(_masterItem){
+        case controlCenterTop:
+            trySetTop(pos.y());
+            break;
+        case controlCenterBottom:
+            trySetBottom(pos.y());
+            break;
+        default:
+            Q_ASSERT(false);
+        }
+        break;
+    case DiagonalResize:
+        switch(_masterItem){
+        case controlLeftTop:
+            trySetLeft(pos.x());
+            trySetTop(pos.y());
+            break;
+        case controlRightTop:
+            trySetRight(pos.x());
+            trySetTop(pos.y());
+            break;
+        case controlRightBottom:
+            trySetRight(pos.x());
+            trySetBottom(pos.y());
+            break;
+        case controlLeftBottom:
+            qDebug() << "case Left Bottom";
+            trySetLeft(pos.x());
+            trySetBottom(pos.y());
+            break;
+        default:
+            Q_ASSERT(false);
+        }
+        break;
     }
-    else{
 
-    }
+
 
 }
 
@@ -51,9 +99,11 @@ void WidgetAreaSelect::mousePressEvent(QMouseEvent *event)
         return;
 
     _resizeMode = NoResize;
+    _masterItem = controlNothing;
     for(int itemIndex = 0; itemIndex < controlsCount; ++itemIndex){
         Controls item = static_cast<Controls>(itemIndex);
         if(rectOf(item).contains(event->pos())){
+            _masterItem = item;
             _resizeMode = resizeModeOf(item);
             break;
         }
@@ -64,6 +114,7 @@ void WidgetAreaSelect::mouseReleaseEvent(QMouseEvent *event)
 {
     QWidget::mouseReleaseEvent(event);
     _resizeMode = NoResize;
+    _masterItem = controlNothing;
 }
 
 void WidgetAreaSelect::paintEvent(QPaintEvent *)
@@ -86,6 +137,7 @@ void WidgetAreaSelect::init()
     setMouseTracking(true);
     _interacted = false;
     _resizeMode = NoResize;
+    _masterItem = controlNothing;
 }
 
 void WidgetAreaSelect::drawBackground(QPainter *painter)
@@ -244,14 +296,111 @@ WidgetAreaSelect::ResizeModes WidgetAreaSelect::resizeModeOf(WidgetAreaSelect::C
         return DiagonalResize;
     case controlCenterTop:
     case controlCenterBottom:
-        return HorizontalResize;
+        return VerticalResize;
     case controlRightCenter:
     case controlLeftCenter:
-        return VerticalResize;
+        return HorizontalResize;
     default:
         return NoResize;
     }
 }
+
+void WidgetAreaSelect::trySetLeft(int pos)
+{
+    qDebug() << "trySetLeft "<< pos;
+    if(pos < rect().left())
+        pos = rect().left();
+    if(pos > _rectInner.right() - _minWidth)
+        pos = _rectInner.right() - _minWidth;
+
+    _rectInner.setLeft(pos);
+    update();
+}
+
+void WidgetAreaSelect::trySetTop(int pos)
+{
+    qDebug() << "trySetTop "<< pos;
+    if(pos < rect().top())
+        pos = rect().top();
+    if(pos > _rectInner.bottom() - _minHeight)
+        pos = _rectInner.bottom() - _minHeight;
+
+    _rectInner.setTop(pos);
+    update();
+}
+
+
+void WidgetAreaSelect::trySetRight(int pos)
+{
+    qDebug() << "trySetRight "<< pos;
+
+    if(pos > rect().right())
+        pos = rect().right();
+    if(pos < _rectInner.left() + _minWidth)
+        pos = _rectInner.left() + _minWidth;
+
+    _rectInner.setRight(pos);
+    update();
+}
+
+void WidgetAreaSelect::trySetBottom(int pos)
+{
+    qDebug() << "trySetBottom "<< pos;
+
+    if(pos > rect().bottom())
+        pos = rect().bottom();
+    if(pos < _rectInner.top() + _minHeight)
+        pos = _rectInner.top() + _minHeight;
+
+    _rectInner.setBottom(pos);
+    update();
+}
+
+void WidgetAreaSelect::updateMasterItem(const QPoint &pos)
+{
+    Controls newMasterItem = masterItem(pos);
+    if(newMasterItem != _masterItem){
+        _masterItem = newMasterItem;
+        qDebug() << "new MasterItem: "<< _masterItem;
+        setCursor(QCursor(shapeOf(_masterItem)));
+    }
+}
+
+WidgetAreaSelect::Controls WidgetAreaSelect::masterItem(const QPoint &pos) const
+{
+    const QPoint &center = _rectInner.center();
+    switch(_resizeMode){
+    case DiagonalResize:
+        if(pos.x() < center.x())
+            if(pos.y() < center.y())
+                return controlLeftTop;
+            else
+                return controlLeftBottom;
+        else
+            if(pos.y() > center.y())
+                return controlRightBottom;
+            else
+                return controlRightTop;
+        break;
+    case HorizontalResize:
+        if(pos.x() < center.x())
+            return controlLeftCenter;
+        else
+            return controlRightCenter;
+        break;
+    case VerticalResize:
+        if(pos.y() < center.y())
+            return controlCenterTop;
+        else
+            return controlCenterBottom;
+    case NoResize:
+        return controlNothing;
+    default:
+        Q_ASSERT(false);
+        return controlNothing;
+    }
+}
+
 
 QRect WidgetAreaSelect::controlItemRectByPos(const QPoint &pos) const
 {

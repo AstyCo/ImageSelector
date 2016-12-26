@@ -18,15 +18,15 @@ public:
     enum Controls{
         controlFirst=0,
         controlLeftTop=0,
-        controlCenterTop,
-        controlRightTop,
-        controlRightCenter,
-        controlRightBottom,
-        controlCenterBottom,
-        controlLeftBottom,
-        controlLeftCenter,
+        controlCenterTop,   //  1
+        controlRightTop,    //  2
+        controlRightCenter, //  3
+        controlRightBottom, //  4
+        controlCenterBottom,//  5
+        controlLeftBottom,  //  6
+        controlLeftCenter,  //  7
 
-        controlNothing,
+        controlNothing,     //  8
         controlsCount = controlNothing
     };
 
@@ -63,10 +63,24 @@ private:
     Qt::CursorShape shapeOf(Controls item) const;
     ResizeModes resizeModeOf(Controls item) const;
 
+    // QRect set* functions with check limits
+    void trySetLeft(int pos);
+    void trySetBottom(int pos);
+    void trySetRight(int pos);
+    void trySetTop(int pos);
+
+    Controls masterItem(const QPoint &pos) const;
+    void updateMasterItem(const QPoint &pos);
+
+    //
+
+
     QRect controlItemRectByPos(const QPoint &pos) const;
 
 private:
+    const int _minWidth,_minHeight;
 
+    Controls _masterItem;
     ResizeModes _resizeMode;
     QRect _rectInner;
     bool _interacted;
