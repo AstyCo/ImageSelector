@@ -8,10 +8,11 @@ class WidgetAreaSelect : public QWidget
     Q_OBJECT
 
 public:
-    enum ResizeModes{
+    enum ResizeModes {
         DiagonalResize,
         HorizontalResize,
         VerticalResize,
+        AllResize, // drag mode
         NoResize
     };
 
@@ -33,6 +34,16 @@ public:
     WidgetAreaSelect(QWidget *parent = 0);
     virtual ~WidgetAreaSelect();
 
+    void setImagePath(const QString &path);     ///< Путь к файлу изображения
+
+    void setActualSize(int width, int height);  ///< Устанавливает размер области (QWidget отображает относительный размер)h, int height); ///< Устанавливает размер области (QWidget отображает относительный размер)
+    void setActualSize(const QSize &size);      ///< Устанавливает размер области (QWidget отображает относительный размер)ize &size);     ///< Устанавливает размер области (QWidget отображает относительный размер)
+
+    QRect selectedRect() const;                 ///< возвращает выбранную область                                                          ///< возвращает выбранную область
+    int selectedX() const;                      ///< для удобства
+    int selectedY() const;                      ///< для удобства
+    int selectedWidth() const;                  ///< для удобства
+    int selectedHeight() const;                 ///< для удобства
 
 protected:
     void mouseMoveEvent(QMouseEvent *event);
@@ -63,27 +74,33 @@ private:
     Qt::CursorShape shapeOf(Controls item) const;
     ResizeModes resizeModeOf(Controls item) const;
 
-    // QRect set* functions with check limits
+    // QRect set*/move* functions with check limits
     void trySetLeft(int pos);
     void trySetBottom(int pos);
     void trySetRight(int pos);
     void trySetTop(int pos);
 
-    Controls masterItem(const QPoint &pos) const;
-    void updateMasterItem(const QPoint &pos);
+    void tryMoveLeft(int dx);
+    void tryMoveTop(int dy);
 
     //
+    Controls masterItem(const QPoint &pos) const;
+    void updateMasterItem(const QPoint &pos);
+    void loadPixmaps(const QString &imagePath = QString());
 
 
     QRect controlItemRectByPos(const QPoint &pos) const;
 
 private:
     const int _minWidth,_minHeight;
+    QPoint _lastMouseEventAt;
 
     Controls _masterItem;
     ResizeModes _resizeMode;
     QRect _rectInner;
-    bool _interacted;
+    QSize _actualSize;
+
+    QPixmap _pixmapInner, _pixmapOuter, _pixmapControl;
 };
 
 #endif // WIDGETAREASELECT_H

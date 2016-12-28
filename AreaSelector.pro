@@ -17,3 +17,6 @@ SOURCES += main.cpp \
 
 HEADERS  += \
     widgetareaselect.h
+
+RESOURCES += \
+    rs.qrc

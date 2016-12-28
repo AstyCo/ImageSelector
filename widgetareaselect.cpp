@@ -3,6 +3,8 @@
 #include <QApplication>
 #include <QResizeEvent>
 #include <QPainter>
+#include <QTransform>
+#include <QResizeEvent>
 #include <QDebug>
 
 enum DefaultSizes{
@@ -21,6 +23,53 @@ WidgetAreaSelect::~WidgetAreaSelect()
 
 }
 
+void WidgetAreaSelect::setImagePath(const QString &path)
+{
+    loadPixmaps(path);
+}
+
+void WidgetAreaSelect::setActualSize(int width, int height)
+{
+    setActualSize(QSize(width,height));
+}
+
+void WidgetAreaSelect::setActualSize(const QSize &size)
+{
+    _actualSize = size;
+}
+
+QRect WidgetAreaSelect::selectedRect() const
+{
+    if(_actualSize.isValid()){
+        QTransform matrix;
+        matrix.scale(
+                    _actualSize.width() / rect().width(),
+                    _actualSize.height() / rect().height() );
+        return matrix.mapRect(_rectInner);
+    }
+    return _rectInner;
+}
+
+int WidgetAreaSelect::selectedX() const
+{
+    return selectedRect().x();
+}
+
+int WidgetAreaSelect::selectedY() const
+{
+    return selectedRect().y();
+}
+
+int WidgetAreaSelect::selectedWidth() const
+{
+    return selectedRect().width();
+}
+
+int WidgetAreaSelect::selectedHeight() const
+{
+    return selectedRect().height();
+}
+
 void WidgetAreaSelect::mouseMoveEvent(QMouseEvent *event)
 {
     QWidget::mouseMoveEvent(event);
@@ -31,6 +80,8 @@ void WidgetAreaSelect::mouseMoveEvent(QMouseEvent *event)
     switch(_resizeMode){
     case NoResize:
         setCursor(QCursor());
+        if(_rectInner.contains(pos))
+            setCursor(QCursor(Qt::SizeAllCursor));
         for(int itemIndex = 0; itemIndex < controlsCount; ++itemIndex){
             Controls item = static_cast<Controls>(itemIndex);
             if(rectOf(item).contains(pos)){
@@ -38,6 +89,12 @@ void WidgetAreaSelect::mouseMoveEvent(QMouseEvent *event)
                 break;
             }
         }
+        break;
+    case AllResize:
+        if(_lastMouseEventAt.isNull())
+            break;
+        tryMoveLeft(pos.x() - _lastMouseEventAt.x());
+        tryMoveTop(pos.y() - _lastMouseEventAt.y());
         break;
     case HorizontalResize:
         switch(_masterItem){
@@ -88,8 +145,7 @@ void WidgetAreaSelect::mouseMoveEvent(QMouseEvent *event)
         break;
     }
 
-
-
+    _lastMouseEventAt = event->pos();
 }
 
 void WidgetAreaSelect::mousePressEvent(QMouseEvent *event)
@@ -98,7 +154,10 @@ void WidgetAreaSelect::mousePressEvent(QMouseEvent *event)
     if(event->button()!=Qt::LeftButton)
         return;
 
-    _resizeMode = NoResize;
+    if(_rectInner.contains(event->pos()))
+        _resizeMode = AllResize;
+    else
+        _resizeMode = NoResize;
     _masterItem = controlNothing;
     for(int itemIndex = 0; itemIndex < controlsCount; ++itemIndex){
         Controls item = static_cast<Controls>(itemIndex);
@@ -120,6 +179,8 @@ void WidgetAreaSelect::mouseReleaseEvent(QMouseEvent *event)
 void WidgetAreaSelect::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);          // antialiasing
+    painter.setRenderHint(QPainter::SmoothPixmapTransform); // QPixmap proper transformation
 
     drawBackground(&painter);
     drawSelect(&painter);
@@ -127,68 +188,70 @@ void WidgetAreaSelect::paintEvent(QPaintEvent *)
 
 void WidgetAreaSelect::resizeEvent(QResizeEvent *event)
 {
+    if(!event->oldSize().isValid()){    //  fits QWidget's rect(),
+        _rectInner = rect();            //  by default
+        QWidget::resizeEvent(event);    //
+        return;                         //
+    }                                   //
+    QTransform matrix;
+    matrix.scale(event->size().width() * 1.0 / event->oldSize().width(),
+                 event->size().height() * 1.0 / event->oldSize().height());
+
+    _rectInner = matrix.mapRect(_rectInner);
     QWidget::resizeEvent(event);
-    if(!_interacted)
-        _rectInner = QRect(QPoint(10,10),QSize(200,200));// test
+    update();
 }
 
 void WidgetAreaSelect::init()
 {
     setMouseTracking(true);
-    _interacted = false;
     _resizeMode = NoResize;
     _masterItem = controlNothing;
+
+    _pixmapControl = QPixmap(defaultControlPointEdge,defaultControlPointEdge);
+    _pixmapControl.fill(QColor(Qt::gray));
+    loadPixmaps();
+//    loadPixmaps(":/resource/Capture001.png");
 }
 
 void WidgetAreaSelect::drawBackground(QPainter *painter)
 {
-    QPixmap pixmapOuter(size());
-    QPainter painterPixmap(&pixmapOuter);
-    pixmapOuter.fill(QColor(Qt::gray)); // test
-    painterPixmap.setBrush(QBrush(QColor(0,0,0, 128)));
-    painterPixmap.drawRect(pixmapOuter.rect());
-
-    painter->drawPixmap(rect(), pixmapOuter);
+    painter->drawPixmap(rect(), _pixmapOuter);
 }
 
 void WidgetAreaSelect::drawSelect(QPainter *painter)
 {
-    QPixmap pixmapInner(size());
-    pixmapInner.fill(QColor(Qt::gray)); // test
+    QTransform matrix;
+    matrix.scale(_pixmapInner.rect().width() * 1.0 / rect().width(),
+                 _pixmapInner.rect().height() * 1.0 / rect().height());
 
-    painter->drawPixmap(_rectInner,pixmapInner);
+    painter->drawPixmap(_rectInner,_pixmapInner,matrix.mapRect(_rectInner));
     drawControlItems(painter);
 }
 
 void WidgetAreaSelect::drawControlItems(QPainter *painter)
 {
-    QPixmap pixmapControl(defaultControlPointEdge,defaultControlPointEdge);
-//    QPainter painterPixmap(&pixmapControl);
-//    painterPixmap.setBrush(QBrush(QColor(0,0,0, 128)));
-//    painterPixmap.drawRect(pixmapControl.rect());
-    pixmapControl.fill(QColor(Qt::gray));
-
     painter->save();
     painter->setOpacity(0.5);
 
     QPoint center = _rectInner.center();
 
     drawControlItem(leftTopRect(),
-                    pixmapControl, painter);
+                    _pixmapControl, painter);
     drawControlItem(centerTopRect(),
-                    pixmapControl, painter);
+                    _pixmapControl, painter);
     drawControlItem(rightTopRect(),
-                    pixmapControl, painter);
+                    _pixmapControl, painter);
     drawControlItem(rightCenterRect(),
-                    pixmapControl, painter);
+                    _pixmapControl, painter);
     drawControlItem(rightBottomRect(),
-                    pixmapControl, painter);
+                    _pixmapControl, painter);
     drawControlItem(centerBottomRect(),
-                    pixmapControl, painter);
+                    _pixmapControl, painter);
     drawControlItem(leftBottomRect(),
-                    pixmapControl, painter);
+                    _pixmapControl, painter);
     drawControlItem(leftCenterRect(),
-                    pixmapControl, painter);
+                    _pixmapControl, painter);
 
     painter->restore();
 }
@@ -282,6 +345,8 @@ Qt::CursorShape WidgetAreaSelect::shapeOf(Controls item) const
     case controlLeftCenter:
         return Qt::SizeHorCursor;
     default:
+        if(_resizeMode == AllResize)
+            return Qt::SizeAllCursor;
         return Qt::ArrowCursor;
     }
 }
@@ -305,35 +370,8 @@ WidgetAreaSelect::ResizeModes WidgetAreaSelect::resizeModeOf(WidgetAreaSelect::C
     }
 }
 
-void WidgetAreaSelect::trySetLeft(int pos)
-{
-    qDebug() << "trySetLeft "<< pos;
-    if(pos < rect().left())
-        pos = rect().left();
-    if(pos > _rectInner.right() - _minWidth)
-        pos = _rectInner.right() - _minWidth;
-
-    _rectInner.setLeft(pos);
-    update();
-}
-
-void WidgetAreaSelect::trySetTop(int pos)
-{
-    qDebug() << "trySetTop "<< pos;
-    if(pos < rect().top())
-        pos = rect().top();
-    if(pos > _rectInner.bottom() - _minHeight)
-        pos = _rectInner.bottom() - _minHeight;
-
-    _rectInner.setTop(pos);
-    update();
-}
-
-
 void WidgetAreaSelect::trySetRight(int pos)
 {
-    qDebug() << "trySetRight "<< pos;
-
     if(pos > rect().right())
         pos = rect().right();
     if(pos < _rectInner.left() + _minWidth)
@@ -345,8 +383,6 @@ void WidgetAreaSelect::trySetRight(int pos)
 
 void WidgetAreaSelect::trySetBottom(int pos)
 {
-    qDebug() << "trySetBottom "<< pos;
-
     if(pos > rect().bottom())
         pos = rect().bottom();
     if(pos < _rectInner.top() + _minHeight)
@@ -356,6 +392,75 @@ void WidgetAreaSelect::trySetBottom(int pos)
     update();
 }
 
+void WidgetAreaSelect::trySetLeft(int pos)
+{
+    if(pos < rect().left())
+        pos = rect().left();
+    if(pos > _rectInner.right() - _minWidth)
+        pos = _rectInner.right() - _minWidth;
+
+    _rectInner.setLeft(pos);
+    update();
+}
+
+void WidgetAreaSelect::trySetTop(int pos)
+{
+    if(pos < rect().top())
+        pos = rect().top();
+    if(pos > _rectInner.bottom() - _minHeight)
+        pos = _rectInner.bottom() - _minHeight;
+
+    _rectInner.setTop(pos);
+    update();
+}
+
+void WidgetAreaSelect::tryMoveLeft(int dx)
+{
+    int pos = _rectInner.x() + dx;
+    if(pos < rect().left())
+        pos = rect().left();
+    if(pos >  rect().right() - _rectInner.width())
+        pos = rect().right() - _rectInner.width() + 1;
+
+    _rectInner.moveLeft(pos);
+    update();
+}
+
+void WidgetAreaSelect::tryMoveTop(int dy)
+{
+    int pos = _rectInner.y() + dy;
+    if(pos < rect().top())
+        pos = rect().top();
+    if(pos > rect().bottom() - _rectInner.height())
+        pos = rect().bottom() - _rectInner.height() + 1;
+
+    _rectInner.moveTop(pos);
+    qDebug() << "rect().bottom() - _rectInner.height() " << rect().bottom() - _rectInner.height();
+    qDebug() << "bottom " << rect().bottom();
+    qDebug() << "inner bottom " << _rectInner.bottom();
+
+    update();
+}
+
+//void WidgetAreaSelect::tryMoveTo(const QPoint &pos)
+//{
+
+//    if(_pressedAt.isNull()){
+//        qWarning("WidgetAreaSelect::tryMoveTo:: _pressedAt isNull");
+//        return;
+//    }
+//    int relX = pos.x() - _pressedAt.x(),
+//        relY = pos.y() - _pressedAt.y();
+//    QPoint leftTopAt = _pressedAt - _pointInsideRect;
+
+//    tryMoveLeft(leftTopAt.x() + relX);
+//    tryMoveTop(leftTopAt.y() + relY);
+////    tryMoveRight(_rectInner.width() + leftTopAt.x() + relX);
+////    tryMoveBottom(_rectInner.height() + leftTopAt.y() + relY);
+//}
+
+
+
 void WidgetAreaSelect::updateMasterItem(const QPoint &pos)
 {
     Controls newMasterItem = masterItem(pos);
@@ -364,6 +469,25 @@ void WidgetAreaSelect::updateMasterItem(const QPoint &pos)
         qDebug() << "new MasterItem: "<< _masterItem;
         setCursor(QCursor(shapeOf(_masterItem)));
     }
+}
+
+void WidgetAreaSelect::loadPixmaps(const QString &imagePath)
+{
+    _pixmapInner = QPixmap(10,10);
+    _pixmapOuter = QPixmap(10,10);
+
+    if(imagePath.isEmpty() ||
+            !_pixmapInner.load(imagePath) ||
+            !_pixmapOuter.load(imagePath))
+    {
+        _pixmapInner.fill(QColor(Qt::white));
+        _pixmapOuter.fill(QColor(Qt::white));
+    }
+    QPainter painterOuter(&_pixmapOuter);
+    painterOuter.setPen(QPen(Qt::NoPen));
+//    painterOuter.setPen(QPen(QBrush(QColor(Qt::white)),0));
+    painterOuter.setBrush(QBrush(QColor(0,0,0, 128)));
+    painterOuter.drawRect(_pixmapOuter.rect());
 }
 
 WidgetAreaSelect::Controls WidgetAreaSelect::masterItem(const QPoint &pos) const
@@ -394,6 +518,7 @@ WidgetAreaSelect::Controls WidgetAreaSelect::masterItem(const QPoint &pos) const
         else
             return controlCenterBottom;
     case NoResize:
+    case AllResize:
         return controlNothing;
     default:
         Q_ASSERT(false);
