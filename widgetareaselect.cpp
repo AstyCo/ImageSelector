@@ -5,7 +5,6 @@
 #include <QPainter>
 #include <QTransform>
 #include <QResizeEvent>
-#include <QDebug>
 
 enum DefaultSizes{
     defaultControlPointHalfEdge = 5,
@@ -137,7 +136,6 @@ void WidgetAreaSelect::mouseMoveEvent(QMouseEvent *event)
             trySetBottom(pos.y());
             break;
         case controlLeftBottom:
-            qDebug() << "case Left Bottom";
             trySetLeft(pos.x());
             trySetBottom(pos.y());
             break;
@@ -457,31 +455,12 @@ void WidgetAreaSelect::tryMoveTop(int dy)
     update();
 }
 
-//void WidgetAreaSelect::tryMoveTo(const QPoint &pos)
-//{
-
-//    if(_pressedAt.isNull()){
-//        qWarning("WidgetAreaSelect::tryMoveTo:: _pressedAt isNull");
-//        return;
-//    }
-//    int relX = pos.x() - _pressedAt.x(),
-//        relY = pos.y() - _pressedAt.y();
-//    QPoint leftTopAt = _pressedAt - _pointInsideRect;
-
-//    tryMoveLeft(leftTopAt.x() + relX);
-//    tryMoveTop(leftTopAt.y() + relY);
-////    tryMoveRight(_rectInner.width() + leftTopAt.x() + relX);
-////    tryMoveBottom(_rectInner.height() + leftTopAt.y() + relY);
-//}
-
-
 
 void WidgetAreaSelect::updateMasterItem(const QPoint &pos)
 {
     Controls newMasterItem = masterItem(pos);
     if(newMasterItem != _masterItem){
         _masterItem = newMasterItem;
-        qDebug() << "new MasterItem: "<< _masterItem;
         setCursor(QCursor(shapeOf(_masterItem)));
     }
 }
@@ -500,7 +479,6 @@ void WidgetAreaSelect::loadPixmaps(const QString &imagePath)
     }
     QPainter painterOuter(&_pixmapOuter);
     painterOuter.setPen(QPen(Qt::NoPen));
-//    painterOuter.setPen(QPen(QBrush(QColor(Qt::white)),0));
     painterOuter.setBrush(QBrush(QColor(0,0,0, 128)));
     painterOuter.drawRect(_pixmapOuter.rect());
 }
