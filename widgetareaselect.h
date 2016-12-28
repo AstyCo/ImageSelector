@@ -45,9 +45,13 @@ public:
     int selectedWidth() const;                  ///< для удобства
     int selectedHeight() const;                 ///< для удобства
 
+signals:
+    void selectionChanged();   ///< Посылается по соответствующему событию
+
 protected:
     void mouseMoveEvent(QMouseEvent *event);
     void mousePressEvent(QMouseEvent *event);
+    void mouseDoubleClickEvent(QMouseEvent *);
     void mouseReleaseEvent(QMouseEvent *event);
     void paintEvent(QPaintEvent *);
     void resizeEvent(QResizeEvent *);

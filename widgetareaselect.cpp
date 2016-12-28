@@ -43,8 +43,8 @@ QRect WidgetAreaSelect::selectedRect() const
     if(_actualSize.isValid()){
         QTransform matrix;
         matrix.scale(
-                    _actualSize.width() / rect().width(),
-                    _actualSize.height() / rect().height() );
+                    _actualSize.width() * 1. / rect().width(),
+                    _actualSize.height() * 1. / rect().height() );
         return matrix.mapRect(_rectInner);
     }
     return _rectInner;
@@ -105,7 +105,8 @@ void WidgetAreaSelect::mouseMoveEvent(QMouseEvent *event)
             trySetRight(pos.x());
             break;
         default:
-            Q_ASSERT(false);
+            qWarning("UNEXPECTED CASE");
+            break;
         }
         break;
     case VerticalResize:
@@ -117,7 +118,8 @@ void WidgetAreaSelect::mouseMoveEvent(QMouseEvent *event)
             trySetBottom(pos.y());
             break;
         default:
-            Q_ASSERT(false);
+            qWarning("UNEXPECTED CASE");
+            break;
         }
         break;
     case DiagonalResize:
@@ -140,7 +142,8 @@ void WidgetAreaSelect::mouseMoveEvent(QMouseEvent *event)
             trySetBottom(pos.y());
             break;
         default:
-            Q_ASSERT(false);
+            qWarning("UNEXPECTED CASE");
+            break;
         }
         break;
     }
@@ -166,6 +169,16 @@ void WidgetAreaSelect::mousePressEvent(QMouseEvent *event)
             _resizeMode = resizeModeOf(item);
             break;
         }
+    }
+}
+
+void WidgetAreaSelect::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    QWidget::mouseDoubleClickEvent(event);
+    if(_rectInner.contains(event->pos())){
+        _rectInner = rect();
+        emit selectionChanged();
+        update();
     }
 }
 
@@ -378,6 +391,7 @@ void WidgetAreaSelect::trySetRight(int pos)
         pos = _rectInner.left() + _minWidth;
 
     _rectInner.setRight(pos);
+    emit selectionChanged();
     update();
 }
 
@@ -389,6 +403,7 @@ void WidgetAreaSelect::trySetBottom(int pos)
         pos = _rectInner.top() + _minHeight;
 
     _rectInner.setBottom(pos);
+    emit selectionChanged();
     update();
 }
 
@@ -400,6 +415,7 @@ void WidgetAreaSelect::trySetLeft(int pos)
         pos = _rectInner.right() - _minWidth;
 
     _rectInner.setLeft(pos);
+    emit selectionChanged();
     update();
 }
 
@@ -411,6 +427,7 @@ void WidgetAreaSelect::trySetTop(int pos)
         pos = _rectInner.bottom() - _minHeight;
 
     _rectInner.setTop(pos);
+    emit selectionChanged();
     update();
 }
 
@@ -423,6 +440,7 @@ void WidgetAreaSelect::tryMoveLeft(int dx)
         pos = rect().right() - _rectInner.width() + 1;
 
     _rectInner.moveLeft(pos);
+    emit selectionChanged();
     update();
 }
 
@@ -435,10 +453,7 @@ void WidgetAreaSelect::tryMoveTop(int dy)
         pos = rect().bottom() - _rectInner.height() + 1;
 
     _rectInner.moveTop(pos);
-    qDebug() << "rect().bottom() - _rectInner.height() " << rect().bottom() - _rectInner.height();
-    qDebug() << "bottom " << rect().bottom();
-    qDebug() << "inner bottom " << _rectInner.bottom();
-
+    emit selectionChanged();
     update();
 }
 
@@ -521,7 +536,7 @@ WidgetAreaSelect::Controls WidgetAreaSelect::masterItem(const QPoint &pos) const
     case AllResize:
         return controlNothing;
     default:
-        Q_ASSERT(false);
+        qWarning("UNEXPECTED CASE");
         return controlNothing;
     }
 }
